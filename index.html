@@ -1,99 +1,101 @@
-<!DOCTYPE html>
+
 <html>
-  <head>
-    <title>Easy example | CartoDB.js</title>
-    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
-    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
-    <link rel="shortcut icon" href="http://cartodb.com/assets/favicon.ico" />
-    <style>
-      html, body, #map {
-        height: 100%;
-        padding: 0;
-        margin: 0;
-      }
-    </style>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="http://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/3.15/themes/css/cartodb.css" />
+  <script src="http://cartodb-libs.global.ssl.fastly.net/cartodb.js/v3/3.15/cartodb.js"></script>
+	<style>
+    html, body {width:100%; height:100%; padding: 0; margin: 0;}
+    #map { width: 100%; height:100%; background: black;}
 
-    <link rel="stylesheet" href="https://libs.cartocdn.com/cartodb.js/v3/3.15/themes/css/cartodb.css" />
-  </head>
-  <body>
-    <div id="map"></div>
+	</style>
 
-    <!-- include cartodb.js library -->
-    <script src="https://libs.cartocdn.com/cartodb.js/v3/3.15/cartodb.js"></script>
-
-    <script>
+	<script>
     var map;
-      function main() {
-        cartodb.createVis('map', 'https://nbcuniversal.carto.com/u/nbcuniadmin/api/v2/viz/73a5e0b2-7c1c-11e6-bf69-0ee66e2c9693/viz.json', {
-            shareable: false,
-            title: false,
-            description: false,
-            search: false,
-            tiles_loader: true,
-            center_lat: 0,
-            center_lon: 0,
-            zoom: 3
-        })
-        .done(function(vis, layers) {
-          // layer 0 is the base layer, layer 1 is cartodb layer
-          // setInteraction is disabled by default
-          layers[1].setInteraction(true);
-          layers[1].on('featureOver', function(e, latlng, pos, data) {
-            cartodb.log.log(e, latlng, pos, data);
-          });
-          // you can get the native map to work with it
-          map = vis.getNativeMap();
-          // now, perform any operations you need
-          // map.setZoom(3);
-          // map.panTo([50.5, 30.5]);
+
+    function init() {
+      // initiate leaflet map
+      map = new L.Map('map', {
+        center: [20,-20],
+        zoom: 3
+      });
+
+      L.tileLayer('http://dnv9my2eseobd.cloudfront.net/v3/cartodb.map-4xtxp73f/{z}/{x}/{y}.png', {
+        attribution: 'MapBox'
+      }).addTo(map);
+
+      var layerUrl = 'http://nbcuniversal.carto.com/u/nbcuniadmin/api/v2/viz/73a5e0b2-7c1c-11e6-bf69-0ee66e2c9693/viz.json';
+
+      var sublayers = [];
+
+      cartodb.createLayer(map, layerUrl)
+        .addTo(map)
+        .on('done', function(layer) {
+          // change the query for the first layer
+
+          var sublayer = layer.getSubLayer(0);
+
+
           detectUserLocation();
-        })
-        .error(function(err) {
-          console.log(err);
+        }).on('error', function() {
+          //log the error
         });
 
-          function detectUserLocation() {
+      // credit: http://html5doctor.com/finding-your-position-with-geolocation/
+      function detectUserLocation() {
+        if(navigator.geolocation) {
+          var timeoutVal = 10 * 1000 * 1000;
 
-          if(navigator.geolocation) {
-            var timeoutVal = 10 * 1000 * 1000;
-            navigator.geolocation.watchPosition(
-              mapToPosition,
-              alertError,
-              { enableHighAccuracy: true, timeout: timeoutVal, maximumAge: 0 }
-            );
-          } else {
-            alert("Geolocation is not supported by this browser");
-          }
-          function alertError(error) {
-            var errors = {
-              1: 'Permission denied',
-              2: 'Position unavailable',
-              3: 'Request timeout'
-            };
-            console.log("Error: " + errors[error.code]);
-          }
+          navigator.geolocation.watchPosition(
+            mapToPosition,
+            alertError,
+            { enableHighAccuracy: true, timeout: timeoutVal, maximumAge: 0 }
+          );
+        } else {
+          alert("Geolocation is not supported by this browser");
         }
-        function mapToPosition(position){
-          lon = position.coords.longitude;
-          lat = position.coords.latitude;
-          // updateQuery();
-          map.setView(new L.LatLng(lat,lon), 12);
-          new L.CircleMarker([lat,lon],{radius: 8}).addTo(map);
-          //var intersectingSQL = Mustache.render('SELECT address, tickets FROM ({{origSQL}}) As x WHERE ST_Intersects(the_geom, CDB_LatLng({{lat}}, {{lon}}))', {
-            //origSQL: origSQL,
-          //  lat: lat,
-            //lon: lon
-          //});
-          //console.log("New SQL: ", intersectingSQL);
-          // Schema is: cartodb_id, the_geom, name, pop, pop_sqkm
-          //sql.execute(intersectingSQL)
-             //.done(function(data) {
-              // console.log('Name:',data.rows[0]['address']);
-              // console.log('Address:',data.rows[0]['tickets']);
-            // });
+
+        function alertError(error) {
+          var errors = {
+            1: 'Permission denied',
+            2: 'Position unavailable',
+            3: 'Request timeout'
+          };
+
+          alert("Error: " + errors[error.code]);
         }
       }
-      window.onload = main;
-    </script>
-  </body>
+
+      function mapToPosition(position){
+        lon = position.coords.longitude;
+        lat = position.coords.latitude;
+        //updateQuery();
+        map.setView(new L.LatLng(lat,lon), 14);
+        new L.CircleMarker([lat,lon],{radius: 4}).addTo(map);
+      }
+
+      var lon,
+          lat,
+          total = 10;
+
+      function updateQuery() {
+        sublayers[0].set({
+          sql: "WITH cities AS (SELECT cartodb_id, the_geom, the_geom_webmercator, name FROM ne_10m_populated_p_2 ORDER BY the_geom <-> ST_SetSRID(ST_MakePoint("+lon+","+lat+"),4326) ASC LIMIT "+total+") SELECT null as cartodb_id, ST_MakeLine(ST_Transform(ST_SetSRID(ST_MakePoint("+lon+","+lat+"),4326),3857),the_geom_webmercator) as the_geom_webmercator, null as name FROM cities UNION ALL SELECT cartodb_id, the_geom_webmercator, name FROM cities",
+          cartocss: "#ne_10m_populated_p_2{[mapnik-geometry-type = 1]{text-name: [name]; text-face-name: 'DejaVu Sans Book'; text-size: 12; text-fill: #000; text-allow-overlap: false; text-halo-fill: #FFF; text-halo-radius: 2;} [mapnik-geometry-type = 2]{line-color: white; line-opacity: 0.5;} } "
+        });
+      }
+
+      $('.button').click(function() {
+        $('.button').removeClass('selected'); $(this).addClass('selected');
+        total = $(this).attr('id');
+        updateQuery();
+      });
+    }
+	</script>
+</head>
+
+<body onload="init()">
+  <div id='map'></div>
+
+</body>
 </html>
